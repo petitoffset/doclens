@@ -20,6 +20,9 @@ def test_loads_only_the_seventeen_bundled_markdown_sources() -> None:
     )
     assert all(document.source_id.endswith(".md") for document in documents)
     assert all(document.origin == "bundled" for document in documents)
+    assert all(
+        document.display_filename == document.filename for document in documents
+    )
     assert "fact-ledger.yaml" not in {document.source_id for document in documents}
     assert {document.category for document in documents} == {
         "faq",
@@ -77,6 +80,24 @@ def test_chunking_is_deterministic_bounded_and_traceable() -> None:
     assert [chunk.chunk_index for chunk in first] == list(range(len(first)))
     assert len({chunk.chunk_id for chunk in first}) == len(first)
     assert all(chunk.metadata()["source_id"] == document.source_id for chunk in first)
+    assert all(
+        chunk.metadata()["display_filename"] == document.filename for chunk in first
+    )
+
+
+def test_display_filename_does_not_affect_deterministic_chunk_ids() -> None:
+    common = {
+        "content": b"Stable content",
+        "source_id": "uploads/stable.md",
+        "filename": "stable.md",
+        "category": "uploaded",
+        "origin": "upload",
+    }
+
+    first = document_from_bytes(**common, display_filename="Stable Draft.md")
+    second = document_from_bytes(**common, display_filename="Stable Final.md")
+
+    assert chunk_document(first)[0].chunk_id == chunk_document(second)[0].chunk_id
 
 
 def test_chunk_documents_preserves_document_order() -> None:

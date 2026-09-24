@@ -82,6 +82,7 @@ def test_index_persists_and_search_returns_top_three_with_sources(tmp_path) -> N
     assert reopened.count() == 4
     assert len(results) == 3
     assert results[0].metadata["source_id"] == "specifications/rate.md"
+    assert results[0].metadata["display_filename"] == "rate.md"
     assert all(result.text for result in results)
     assert all(result.chunk_id for result in results)
     assert all("chunk_index" in result.metadata for result in results)

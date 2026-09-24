@@ -102,6 +102,7 @@ def test_query_retrieves_top_three_and_returns_traceable_sources(
     assert body["answer"] == "Use exponential backoff."
     assert len(body["sources"]) == 3
     assert body["sources"][0]["source_id"] == "specifications/rate-limits.md"
+    assert body["sources"][0]["display_filename"] == "rate-limits.md"
     assert all(source["chunk_id"] for source in body["sources"])
 
     assert len(responses.calls) == 1
@@ -116,6 +117,41 @@ def test_query_retrieves_top_three_and_returns_traceable_sources(
     assert all(source["source_id"] not in call["input"] for source in body["sources"])
     assert all(source["chunk_id"] not in call["input"] for source in body["sources"])
     assert "This fourth document must not leave the local index." not in call["input"]
+
+
+def test_query_returns_uploaded_display_filename_without_changing_identity(
+    tmp_path: Path,
+) -> None:
+    responses = FakeResponses()
+    generator = OpenAIAnswerGenerator(
+        model="test-model",
+        client=SimpleNamespace(responses=responses),
+    )
+    retriever = PersistentRetriever(
+        persist_directory=tmp_path / "uploaded-chroma",
+        embedding_function=deterministic_embedding,
+        collection_name="test_uploaded_display_filename",
+    )
+
+    with TestClient(create_app(retriever, generator)) as client:
+        upload = client.post(
+            "/api/documents/upload",
+            files={
+                "file": (
+                    "Q3 Customer Success (Final)!.MD",
+                    "API rate limits require retries.",
+                    "text/markdown",
+                )
+            },
+        )
+        response = client.post("/api/query", json={"question": "rate limits"})
+
+    assert upload.status_code == 201
+    assert response.status_code == 200
+    source = response.json()["sources"][0]
+    assert source["filename"] == "Q3_Customer_Success_Final.md"
+    assert source["display_filename"] == "Q3 Customer Success (Final)!.MD"
+    assert source["source_id"] == "uploads/Q3_Customer_Success_Final.md"
 
 
 def test_generation_boundary_limits_context_to_retrieval_top_k() -> None:
