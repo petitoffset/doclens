@@ -5,6 +5,7 @@ from app.ingestion import (
     InvalidFilenameError,
     UnsupportedFileTypeError,
     document_from_upload,
+    sanitize_display_filename,
     sanitize_filename,
 )
 
@@ -42,10 +43,17 @@ def test_upload_size_is_checked_before_shared_document_creation() -> None:
 def test_sanitized_filename_is_the_explicit_upload_source_identity() -> None:
     document = document_from_upload(
         content=b"# Safe content",
-        filename="../../Quarterly Report?.MD",
+        filename="../../Q3 Customer Success (Final)!.MD",
     )
 
-    assert document.filename == "Quarterly_Report.md"
-    assert document.source_id == "uploads/Quarterly_Report.md"
+    assert document.filename == "Q3_Customer_Success_Final.md"
+    assert document.display_filename == "Q3 Customer Success (Final)!.MD"
+    assert document.source_id == "uploads/Q3_Customer_Success_Final.md"
     assert document.origin == "upload"
     assert document.category == "uploaded"
+
+
+def test_display_filename_removes_paths_and_control_characters() -> None:
+    filename = "../private/Quarterly\x00 Report (Final).MD"
+
+    assert sanitize_display_filename(filename) == "Quarterly Report (Final).MD"
