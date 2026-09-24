@@ -55,7 +55,7 @@ Provide a React single-page interface for the complete user flow:
 
 ## 5. Evaluation and documentation
 
-**Status:** Planned
+**Status:** In progress
 
 Measure RAG quality and document the finished MVP:
 
