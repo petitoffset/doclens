@@ -1,0 +1,156 @@
+# Development-only consistency ledger. Only Markdown files under corpus/ are RAG sources.
+product:
+  name: PulseBoard
+  purpose: B2B operational event analytics, dashboards, and alerting
+
+plans:
+  Starter:
+    users_per_workspace: 5
+    event_retention_days: 30
+    alert_rules: 10
+    manual_csv_exports: true
+    scheduled_exports: false
+    email_notifications: true
+    webhook_notifications: false
+    saml_sso: false
+    audit_log: false
+    presentation_links: false
+  Business:
+    users_per_workspace: 50
+    event_retention_days: 180
+    alert_rules: 100
+    manual_csv_exports: true
+    scheduled_exports: true
+    email_notifications: true
+    webhook_notifications: true
+    saml_sso: true
+    audit_log: true
+    presentation_links: true
+
+roles:
+  Viewer:
+    permissions:
+      - view_dashboards
+      - acknowledge_alerts
+      - download_shared_exports
+  Analyst:
+    permissions:
+      - viewer_permissions
+      - create_and_edit_dashboards
+      - create_and_edit_alerts
+      - run_manual_exports
+  Admin:
+    permissions:
+      - analyst_permissions
+      - manage_members
+      - configure_sso
+      - manage_webhooks
+      - schedule_exports
+      - create_presentation_links
+
+ingestion_api:
+  endpoint: POST /v1/events/batch
+  max_events_per_request: 500
+  max_uncompressed_body_mib: 2
+  rate_limit_requests_per_minute_per_workspace: 300
+  accepted_status: 202
+  rate_limited_status: 429
+  rate_limit_retry_header: Retry-After
+  idempotency_key_header: Idempotency-Key
+  idempotency_key_retention_hours: 24
+  reused_key_different_payload_status: 409
+
+csv_import:
+  max_file_mib: 20
+  max_data_rows: 50000
+  encoding: UTF-8
+  retain_original_file: false
+  required_columns:
+    - event_time
+    - metric
+    - value
+  timestamp_format: ISO 8601 with UTC designator or numeric offset
+  atomic_validation: true
+  max_reported_validation_errors: 100
+  normal_processing_minutes: 10
+
+processing:
+  api_normal_queryable_within_seconds: 60
+  backfill_or_degraded_queryable_within_minutes: 10
+  acceptance_means: queued for processing, not yet queryable
+
+dashboards:
+  auto_refresh_seconds: 30
+  query_cache_seconds: 15
+  background_pause_after_minutes: 5
+  max_widgets_per_dashboard: 20
+  relative_ranges_advance_on_refresh: true
+  absolute_ranges_remain_fixed: true
+
+alerts:
+  evaluation_interval_seconds: 60
+  consecutive_breaches_to_fire: 3
+  consecutive_healthy_evaluations_to_recover: 2
+  repeat_notification_cooldown_minutes: 15
+  consecutive_missing_evaluations_to_unknown: 2
+  maintenance_behavior: evaluations continue, notifications are suppressed
+  post_maintenance_behavior: if still firing, notify on the next evaluation
+
+notifications:
+  in_app_available_all_plans: true
+  email_available_all_plans: true
+  email_typical_delivery_seconds: 60
+  email_retry_attempts: 3
+  email_retry_window_minutes: 10
+  webhook_business_only: true
+
+webhooks:
+  protocol: HTTPS
+  max_endpoints_per_workspace: 5
+  request_timeout_seconds: 5
+  success_statuses: HTTP 2xx
+  redirects_followed: false
+  signature_algorithm: HMAC-SHA256
+  signature_header: X-PulseBoard-Signature
+  signature_input: raw_request_body
+  retry_delays_minutes:
+    - 1
+    - 5
+    - 15
+  delivery_record_retention_days: 7
+
+exports:
+  max_rows: 100000
+  download_link_expiry_hours: 24
+  scheduled_frequencies:
+    - daily
+    - weekly
+  constrained_by_event_retention: true
+
+access:
+  saml_protocol: SAML 2.0
+  saml_business_only: true
+  allowed_assertion_clock_skew_minutes: 5
+  session_duration_hours: 8
+
+presentation:
+  business_only: true
+  link_expiry_days: 7
+  refresh_seconds: 30
+  permissions: view_only
+  revocable: true
+
+audit_log:
+  business_only: true
+  retention_days: 90
+  export_max_records: 50000
+  timestamps: UTC
+  includes:
+    - member_and_role_changes
+    - alert_configuration_changes
+    - dashboard_configuration_changes
+    - export_creation
+    - sso_and_webhook_configuration_changes
+  excludes:
+    - dashboard_views
+    - query_text_and_results
