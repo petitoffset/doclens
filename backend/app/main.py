@@ -1,4 +1,4 @@
-"""FastAPI entry point for DocLens ingestion endpoints."""
+"""FastAPI entry point for DocLens ingestion and question-answering endpoints."""
 
 from __future__ import annotations
 
@@ -7,8 +7,14 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
+from app.generation import (
+    INSUFFICIENT_CONTEXT_ANSWER,
+    AnswerConfigurationError,
+    AnswerGenerationError,
+    OpenAIAnswerGenerator,
+)
 from app.ingestion import (
     MAX_UPLOAD_BYTES,
     DocumentTooLargeError,
@@ -17,7 +23,10 @@ from app.ingestion import (
     chunk_document,
     document_from_upload,
 )
-from app.retrieval import PersistentRetriever, index_bundled_corpus
+from app.retrieval import PersistentRetriever, SearchResult, index_bundled_corpus
+
+
+MAX_QUERY_CHARACTERS = 2_000
 
 
 class UploadIndexResponse(BaseModel):
@@ -30,12 +39,42 @@ class CorpusIndexResponse(BaseModel):
     chunks_indexed: int
 
 
-def create_app(retriever: PersistentRetriever | None = None) -> FastAPI:
-    """Create the API, optionally using a supplied retriever for tests."""
+class QueryRequest(BaseModel):
+    question: str = Field(max_length=MAX_QUERY_CHARACTERS)
+
+    @field_validator("question")
+    @classmethod
+    def normalize_question(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Question must not be empty.")
+        return normalized
+
+
+class AnswerSource(BaseModel):
+    source_id: str
+    filename: str
+    category: str
+    origin: str
+    chunk_index: int
+    chunk_id: str
+
+
+class QueryResponse(BaseModel):
+    answer: str
+    sources: list[AnswerSource]
+
+
+def create_app(
+    retriever: PersistentRetriever | None = None,
+    answer_generator: OpenAIAnswerGenerator | None = None,
+) -> FastAPI:
+    """Create the API, optionally using supplied retrieval and generation components."""
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.retriever = retriever or PersistentRetriever()
+        application.state.answer_generator = answer_generator
         yield
 
     application = FastAPI(title="DocLens", lifespan=lifespan)
@@ -92,7 +131,50 @@ def create_app(retriever: PersistentRetriever | None = None) -> FastAPI:
         indexed_count = index_bundled_corpus(request.app.state.retriever)
         return CorpusIndexResponse(chunks_indexed=indexed_count)
 
+    @application.post(
+        "/api/query",
+        response_model=QueryResponse,
+    )
+    def query_documents(payload: QueryRequest, request: Request) -> QueryResponse:
+        results = request.app.state.retriever.search(payload.question)
+        sources = [_answer_source(result) for result in results]
+        if not results:
+            return QueryResponse(
+                answer=INSUFFICIENT_CONTEXT_ANSWER,
+                sources=[],
+            )
+
+        try:
+            generator = request.app.state.answer_generator
+            if generator is None:
+                generator = OpenAIAnswerGenerator.from_environment()
+                request.app.state.answer_generator = generator
+            answer = generator.generate(payload.question, results)
+        except AnswerConfigurationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Answer generation is not configured.",
+            ) from error
+        except AnswerGenerationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Answer generation is temporarily unavailable.",
+            ) from error
+
+        return QueryResponse(answer=answer, sources=sources)
+
     return application
+
+
+def _answer_source(result: SearchResult) -> AnswerSource:
+    return AnswerSource(
+        source_id=result.metadata["source_id"],
+        filename=result.metadata["filename"],
+        category=result.metadata["category"],
+        origin=result.metadata["origin"],
+        chunk_index=result.metadata["chunk_index"],
+        chunk_id=result.chunk_id,
+    )
 
 
 app = create_app()
