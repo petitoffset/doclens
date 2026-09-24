@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
+import re
 from typing import Iterable
+import unicodedata
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -14,12 +16,30 @@ DEFAULT_CORPUS_DIR = PROJECT_ROOT / "corpus"
 # Initial retrieval baseline. Keep these in one place so evaluation can tune them.
 CHUNK_SIZE = 1_000
 CHUNK_OVERLAP = 150
+MAX_UPLOAD_BYTES = 1_048_576
+SUPPORTED_UPLOAD_EXTENSIONS = {".md", ".txt"}
 
 CATEGORY_BY_DIRECTORY = {
     "faqs": "faq",
     "specifications": "specification",
     "support-tickets": "support-ticket",
 }
+
+
+class DocumentValidationError(ValueError):
+    """Base error for documents that cannot enter the ingestion pipeline."""
+
+
+class InvalidFilenameError(DocumentValidationError):
+    pass
+
+
+class UnsupportedFileTypeError(DocumentValidationError):
+    pass
+
+
+class DocumentTooLargeError(DocumentValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,11 +92,11 @@ def document_from_bytes(
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError as error:
-        raise ValueError("Document content must be valid UTF-8.") from error
+        raise DocumentValidationError("Document content must be valid UTF-8.") from error
 
     normalized_text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
     if not normalized_text:
-        raise ValueError("Document content must not be empty.")
+        raise DocumentValidationError("Document content must not be empty.")
 
     return SourceDocument(
         source_id=source_id,
@@ -84,6 +104,53 @@ def document_from_bytes(
         category=category,
         origin=origin,
         text=normalized_text,
+    )
+
+
+def sanitize_filename(filename: str) -> str:
+    """Return a metadata-safe basename with a normalized supported extension."""
+
+    basename = filename.replace("\\", "/").rsplit("/", 1)[-1]
+    normalized = unicodedata.normalize("NFKC", basename).strip()
+    if not normalized:
+        raise InvalidFilenameError("Filename must not be empty.")
+
+    original_suffix = Path(normalized).suffix
+    suffix = original_suffix.lower()
+    if suffix not in SUPPORTED_UPLOAD_EXTENSIONS:
+        raise UnsupportedFileTypeError("Only .md and .txt files are supported.")
+
+    stem = normalized[: -len(original_suffix)]
+    safe_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_-.")
+    if not safe_stem:
+        raise InvalidFilenameError("Filename must contain a safe name before its extension.")
+    return f"{safe_stem}{suffix}"
+
+
+def document_from_upload(
+    *,
+    content: bytes,
+    filename: str,
+    max_upload_bytes: int = MAX_UPLOAD_BYTES,
+) -> SourceDocument:
+    """Validate upload-specific constraints, then enter the shared pipeline.
+
+    The sanitized filename is the MVP source identity. Uploading that filename
+    again intentionally replaces its previously indexed chunks.
+    """
+
+    if len(content) > max_upload_bytes:
+        raise DocumentTooLargeError(
+            f"Document exceeds the {max_upload_bytes}-byte upload limit."
+        )
+
+    sanitized_filename = sanitize_filename(filename)
+    return document_from_bytes(
+        content=content,
+        source_id=f"uploads/{sanitized_filename}",
+        filename=sanitized_filename,
+        category="uploaded",
+        origin="upload",
     )
 
 
