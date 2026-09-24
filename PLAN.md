@@ -43,7 +43,7 @@ Add traceable answer generation and essential runtime safeguards:
 
 ## 4. Minimal frontend
 
-**Status:** In progress
+**Status:** Completed
 
 Provide a React single-page interface for the complete user flow:
 
