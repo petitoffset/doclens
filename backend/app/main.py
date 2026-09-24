@@ -58,6 +58,7 @@ class QueryRequest(BaseModel):
 class AnswerSource(BaseModel):
     source_id: str
     filename: str
+    display_filename: str
     category: str
     origin: str
     chunk_index: int
@@ -201,6 +202,9 @@ def _answer_source(result: SearchResult) -> AnswerSource:
     return AnswerSource(
         source_id=result.metadata["source_id"],
         filename=result.metadata["filename"],
+        display_filename=result.metadata.get(
+            "display_filename", result.metadata["filename"]
+        ),
         category=result.metadata["category"],
         origin=result.metadata["origin"],
         chunk_index=result.metadata["chunk_index"],

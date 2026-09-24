@@ -48,6 +48,7 @@ class SourceDocument:
 
     source_id: str
     filename: str
+    display_filename: str
     category: str
     origin: str
     text: str
@@ -61,6 +62,7 @@ class DocumentChunk:
     text: str
     source_id: str
     filename: str
+    display_filename: str
     category: str
     origin: str
     chunk_index: int
@@ -69,6 +71,7 @@ class DocumentChunk:
         return {
             "source_id": self.source_id,
             "filename": self.filename,
+            "display_filename": self.display_filename,
             "category": self.category,
             "origin": self.origin,
             "chunk_index": self.chunk_index,
@@ -80,6 +83,7 @@ def document_from_bytes(
     content: bytes,
     source_id: str,
     filename: str,
+    display_filename: str | None = None,
     category: str,
     origin: str,
 ) -> SourceDocument:
@@ -101,6 +105,7 @@ def document_from_bytes(
     return SourceDocument(
         source_id=source_id,
         filename=filename,
+        display_filename=filename if display_filename is None else display_filename,
         category=category,
         origin=origin,
         text=normalized_text,
@@ -127,6 +132,18 @@ def sanitize_filename(filename: str) -> str:
     return f"{safe_stem}{suffix}"
 
 
+def sanitize_display_filename(filename: str) -> str:
+    """Return a safe basename while retaining useful human-facing formatting."""
+
+    normalized = unicodedata.normalize("NFKC", filename).replace("\\", "/")
+    basename = normalized.rsplit("/", 1)[-1]
+    return "".join(
+        character
+        for character in basename
+        if not unicodedata.category(character).startswith("C")
+    ).strip()
+
+
 def document_from_upload(
     *,
     content: bytes,
@@ -145,10 +162,12 @@ def document_from_upload(
         )
 
     sanitized_filename = sanitize_filename(filename)
+    display_filename = sanitize_display_filename(filename) or sanitized_filename
     return document_from_bytes(
         content=content,
         source_id=f"uploads/{sanitized_filename}",
         filename=sanitized_filename,
+        display_filename=display_filename,
         category="uploaded",
         origin="upload",
     )
@@ -196,6 +215,7 @@ def chunk_document(
                 text=text,
                 source_id=document.source_id,
                 filename=document.filename,
+                display_filename=document.display_filename,
                 category=document.category,
                 origin=document.origin,
                 chunk_index=chunk_index,
