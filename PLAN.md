@@ -15,7 +15,7 @@ Establish the repository baseline needed for implementation:
 
 ## 2. Ingestion and persistent retrieval
 
-**Status:** Planned
+**Status:** Completed
 
 Build one retrieval path for both bundled and user-provided documents:
 
