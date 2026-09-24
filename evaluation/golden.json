@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "dashboard-refresh-and-cache",
+      "question": "How often does a visible dashboard refresh, and how stale can a cached result be?",
+      "expected_sources": [
+        "specifications/dashboard-refresh.md"
+      ],
+      "reference_answer": "A visible dashboard refreshes every 30 seconds. Equivalent queries may return cached results up to 15 seconds old."
+    },
+    {
+      "id": "ingestion-api-429-recovery",
+      "question": "What should a client do after receiving a 429 response from the PulseBoard ingestion API?",
+      "expected_sources": [
+        "specifications/ingestion-api.md"
+      ],
+      "reference_answer": "The request was not queued. The client should wait for the Retry-After interval before retrying the same batch, reuse its original Idempotency-Key, and use bounded jitter when multiple workers share the workspace limit."
+    },
+    {
+      "id": "csv-atomic-validation",
+      "question": "What happens when one row in a CSV import is invalid, and how many validation errors are reported?",
+      "expected_sources": [
+        "specifications/csv-import.md"
+      ],
+      "reference_answer": "CSV validation is atomic, so one invalid required value causes the whole file to be rejected before any rows are ingested. PulseBoard reports at most 100 validation errors."
+    },
+    {
+      "id": "alert-fire-and-recovery",
+      "question": "How many evaluations make a threshold alert fire and later return it to normal?",
+      "expected_sources": [
+        "specifications/alert-evaluation.md"
+      ],
+      "reference_answer": "A threshold alert fires after three consecutive breaching evaluations and returns to Normal after two consecutive healthy evaluations."
+    },
+    {
+      "id": "webhook-retries",
+      "question": "When a PulseBoard webhook delivery fails, what retry schedule is used and are redirects followed?",
+      "expected_sources": [
+        "specifications/webhook-delivery.md"
+      ],
+      "reference_answer": "After the initial failure, PulseBoard retries after 1, 5, and 15 minutes. Redirects are not followed; a 3xx response is recorded as a failed delivery."
+    },
+    {
+      "id": "plan-capacity-and-retention",
+      "question": "How do Starter and Business differ in workspace members and event retention?",
+      "expected_sources": [
+        "specifications/access-exports-and-retention.md"
+      ],
+      "reference_answer": "Starter supports 5 workspace members and retains event data for 30 days. Business supports 50 members and retains event data for 180 days."
+    },
+    {
+      "id": "audit-log-coverage",
+      "question": "Does the audit log record dashboard views or query text, and how long is it retained?",
+      "expected_sources": [
+        "specifications/audit-log.md"
+      ],
+      "reference_answer": "The audit log does not record ordinary dashboard views or dashboard query text. Audit records are retained for 90 days."
+    },
+    {
+      "id": "csv-support-incident",
+      "question": "Why was the CSV in support ticket PB-1087 rejected, and what fixed it?",
+      "expected_sources": [
+        "support-tickets/PB-1087-csv-import-failure.md"
+      ],
+      "reference_answer": "The CSV was encoded as UTF-16 LE and used local timestamps without a UTC designator or numeric offset, so atomic validation rejected the whole file. Exporting it as UTF-8 with ISO 8601 UTC timestamps and uploading the corrected file fixed the import."
+    },
+    {
+      "id": "accepted-events-to-dashboard",
+      "question": "After an API batch receives 202 Accepted, when should its events appear on a visible dashboard?",
+      "expected_sources": [
+        "specifications/ingestion-api.md",
+        "specifications/dashboard-refresh.md"
+      ],
+      "reference_answer": "A 202 response means the batch is durably queued, not yet queryable. Under normal load it becomes queryable within 60 seconds; after that, a visible dashboard queries every 30 seconds and equivalent results may remain cached for up to 15 seconds."
+    },
+    {
+      "id": "alert-webhook-failure",
+      "question": "If an alert fires but its webhook receiver returns an error, does PulseBoard rerun the alert evaluation and how is delivery retried?",
+      "expected_sources": [
+        "specifications/alert-evaluation.md",
+        "specifications/webhook-delivery.md"
+      ],
+      "reference_answer": "No. A delivery failure does not rerun the alert query or create a new alert transition. Webhook delivery is retried separately after 1, 5, and 15 minutes."
+    },
+    {
+      "id": "presentation-link-access",
+      "question": "Who can create a presentation link, on which plan, and how does the shared dashboard behave?",
+      "expected_sources": [
+        "faqs/mobile-and-presentation-displays.md"
+      ],
+      "reference_answer": "A Business workspace Admin can create a presentation link. It is view-only, expires after seven days unless revoked earlier, and refreshes the dashboard every 30 seconds."
+    },
+    {
+      "id": "scheduled-export-audit",
+      "question": "Can a Starter workspace schedule exports, and is export creation recorded in the audit log?",
+      "expected_sources": [
+        "specifications/access-exports-and-retention.md",
+        "specifications/audit-log.md"
+      ],
+      "reference_answer": "No. Starter workspaces cannot schedule exports. Export creation is recorded in the audit log."
+    }
+  ]
+}
