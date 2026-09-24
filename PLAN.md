@@ -29,7 +29,7 @@ Build one retrieval path for both bundled and user-provided documents:
 
 ## 3. Grounded answering and observability
 
-**Status:** Planned
+**Status:** Completed
 
 Add traceable answer generation and essential runtime safeguards:
 
