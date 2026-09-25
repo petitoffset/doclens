@@ -94,6 +94,23 @@ Generate [`reports/eval.md`](reports/eval.md) automatically with run configurati
 
 **Consequences.** Logs disappear unless the process output is captured externally. The `generated` query outcome means retrieval returned context and generation was invoked; it does not prove that the model produced a substantive answer rather than an abstention. There is no durable audit trail, centralized search, rotation, retention enforcement, or cross-service tracing.
 
-## Production reconsiderations
+## Known limitations
 
-These decisions optimize for a small, reviewable local system. Production planning should begin with concrete requirements, then revisit access control and data governance, tenant isolation, index reconciliation and atomic updates, retrieval quality, evaluation stability, durable observability, operational recovery, and deployment architecture. None of those capabilities should be inferred from this MVP.
+- Retrieval is fixed to the three nearest dense-vector chunks, with no reranking or calibrated relevance gate. Irrelevant nearest chunks can reach generation, and retrieving an expected document does not guarantee that its answer-bearing chunk is present.
+- An upload's technical source identity is its sanitized filename. Re-uploading that identity replaces the prior source, and distinct raw filenames can collide after sanitization. Replacement is not failure-atomic because existing chunks are deleted before embeddings and the replacement upsert are complete.
+- Bundled-corpus indexing updates sources that are present but does not reconcile the collection against files removed or renamed from the corpus, so their old chunks can remain indexed.
+- Upload format validation checks the `.md` or `.txt` extension and successful UTF-8 decoding; it does not inspect MIME type or sniff content format.
+- Returned sources are traceable retrieval metadata. They show which chunks the backend supplied, not which source the model used for each statement in its answer.
+- Query observability records `outcome="generated"` whenever context was retrieved and generation was invoked, including when the model returns the exact insufficient-context abstention. Application logs are stdout-only unless captured externally.
+- The 12-case baseline uses a small synthetic corpus. LLM-judge results are model- and run-dependent, while prompt-injection behavior is demonstrated separately rather than covered by a comprehensive automated security benchmark.
+- Authentication, multi-user isolation, and authorization-aware retrieval are outside the MVP, so the system is not suitable for shared production data as implemented.
+
+## Production next steps
+
+- Broaden evaluation with negative or unanswerable questions, ambiguous wording, and cases representative of real usage. Use that evidence to decide whether chunking or top-k changes, a calibrated relevance threshold, reranking, or hybrid retrieval improve quality.
+- Make source replacement atomic or versioned, reconcile bundled-source membership so removed and renamed files are cleaned safely, and consider a stable source identity independent of sanitized filename and display metadata.
+- Refine query outcomes so answered, model-abstained, no-context, and error paths are distinguishable. Add durable telemetry only where operations justify it, including latency, model and token usage, cost, and tracing without sensitive content.
+- Calibrate LLM-judge results against human labels and track regressions over time. If stronger evaluator independence becomes important, also evaluate an independent judge or provider.
+- For live quality signals, consider sampled asynchronous evaluation and explicit user feedback rather than judging every production request.
+- Before multi-user use, add authentication, tenant isolation, authorization-aware retrieval, and formal data-governance and privacy controls.
+- Add background ingestion and recovery mechanisms, then deployment infrastructure, only when actual workload and reliability requirements justify them.
