@@ -1,67 +1,99 @@
-# Technical Decisions
+# DocLens Technical Decisions
 
-This document records established architectural choices for the DocLens MVP. Exact model names, chunking parameters, limits, schemas, and other implementation details will be selected during implementation.
+This is a lightweight architectural decision record for the completed DocLens MVP. The decisions remain together because the system is small; [`PLAN.md`](PLAN.md) preserves delivery history, while the generated [`reports/eval.md`](reports/eval.md) preserves measured results.
 
-## 1. MVP scope and implementation style
+All decisions below are **accepted for the MVP**. Production use would require revisiting them against real users, data sensitivity, scale, and operating constraints.
 
-**Context:** DocLens is a technical interview exercise that must demonstrate a coherent RAG workflow without production-scale complexity.
+## Decision index
 
-**Decision:** Prefer simple, explicit application code and official SDKs. Do not add LangChain, provider abstractions, reranking, authentication, queues, deployment infrastructure, or other non-MVP features without approval.
+| ID | Decision | Primary evidence |
+| --- | --- | --- |
+| [DL-001](#dl-001--focused-mvp-with-explicit-code) | Focused MVP with explicit code | [`PLAN.md`](PLAN.md), repository structure |
+| [DL-002](#dl-002--python-api-and-react-client) | Python API and React client | [`backend/pyproject.toml`](backend/pyproject.toml), [`frontend/package.json`](frontend/package.json) |
+| [DL-003](#dl-003--shared-local-ingestion-and-retrieval) | Shared local ingestion and retrieval | [`backend/app/ingestion.py`](backend/app/ingestion.py), [`backend/app/retrieval.py`](backend/app/retrieval.py) |
+| [DL-004](#dl-004--narrow-external-llm-boundary) | Narrow external LLM boundary | [`backend/app/generation.py`](backend/app/generation.py), [`backend/tests/test_prompt_guardrails.py`](backend/tests/test_prompt_guardrails.py) |
+| [DL-005](#dl-005--quality-evaluation-separate-from-security-validation) | Quality evaluation separate from security validation | [`evaluation/golden.json`](evaluation/golden.json), [`reports/eval.md`](reports/eval.md) |
+| [DL-006](#dl-006--minimal-structured-observability) | Minimal structured observability | [`backend/app/observability.py`](backend/app/observability.py), [`logs/example.jsonl`](logs/example.jsonl) |
 
-**Why it fits:** The important data flow and trade-offs remain visible and easy to explain.
+## DL-001 — Focused MVP with explicit code
 
-**Trade-off:** The MVP deliberately lacks production capabilities and interchangeable infrastructure.
+**Context.** The assignment needs a coherent, defensible RAG workflow, not a production platform. Extra abstraction would make the important data flow harder to inspect within the exercise.
 
-## 2. Application stack
+**Decision.** Keep application code direct and use official or focused libraries. Do not introduce LangChain, provider abstractions, authentication, queues, deployment infrastructure, or other unapproved production features.
 
-**Context:** The project requires an API and a minimal browser interface.
+**Rationale.** The repository exposes the ingestion, retrieval, generation, and evaluation boundaries directly, making their behavior and trade-offs easier to test and explain.
 
-**Decision:** Use Python with FastAPI for the backend and React for a single-page frontend.
+**Alternatives considered.** LangChain and a multi-provider layer were deliberately deferred because the MVP has one concrete workflow and one external provider. Authentication, background processing, and deployment infrastructure were also excluded until requirements justify them.
 
-**Why it fits:** Python supports the local ML workflow directly, while React is sufficient for the small interactive UI.
+**Consequences.** The code is small and legible, but the system is not provider-portable or production-ready. The completed scope and exclusions are recorded in [`PLAN.md`](PLAN.md).
 
-**Trade-off:** The project has separate backend and frontend runtimes and dependency sets.
+## DL-002 — Python API and React client
 
-## 3. Ingestion and local retrieval
+**Context.** DocLens needs local ML integration, an HTTP API, and a minimal browser demo.
 
-**Context:** Both bundled demonstration documents and user uploads must use the same searchable index while keeping corpus processing local.
+**Decision.** Use Python 3.11 and FastAPI for the backend, with dependencies managed by `uv` and a committed lockfile. Use React, TypeScript, and Vite for the single-page client, with npm and a committed lockfile.
 
-**Decision:** Accept `.md` and `.txt` documents through one validation, parsing, chunking, embedding, and indexing pipeline. Generate embeddings locally with Sentence Transformers, persist indexed chunks, embeddings, and required source metadata in embedded ChromaDB, and use semantic top-3 retrieval without reranking. Uploaded source files are not retained as separate raw copies after ingestion.
+**Rationale.** Python supports Sentence Transformers and ChromaDB directly. React provides the required interactive flow without expanding the backend into UI concerns; TypeScript and the production build add lightweight client-side verification.
 
-**Why it fits:** A shared pipeline avoids inconsistent behavior, and local persistent retrieval provides a complete workflow without an additional service.
+**Alternatives considered.** The stack was an established project direction, so a broad framework comparison was not warranted. Deployment infrastructure was deliberately deferred under the MVP scope.
 
-**Trade-off:** Format support and retrieval sophistication are intentionally limited. Reprocessing an upload from its original form requires the user to upload it again.
+**Consequences.** Backend and frontend have separate runtimes and dependency sets. Vite handles local API proxying; no production hosting or deployment topology is defined.
 
-## 4. External LLM boundary and grounded answers
+## DL-003 — Shared local ingestion and retrieval
 
-**Context:** Answer generation and LLM-based evaluation require an external model, but the document corpus should remain local wherever possible.
+**Context.** Bundled documents and uploads must behave consistently, remain locally searchable across restarts, and avoid additional services.
 
-**Decision:** Use the OpenAI API only for grounded answer generation and evaluation. Send only the user question and retrieved context, never the full corpus. Instruct the model to answer from that context and state when it is insufficient. Return sources directly from retrieved-chunk metadata rather than using a separate citation-validation subsystem.
+**Decision.** Route bundled Markdown and uploaded `.md`/`.txt` files through the same validation, decoding, chunking, embedding, and indexing path. Use 1,000-character chunks with 150-character overlap, local `sentence-transformers/all-MiniLM-L6-v2` embeddings, embedded persistent ChromaDB, and semantic top-three retrieval without reranking.
 
-**Why it fits:** This provides useful answers and traceability while minimizing external data exposure and implementation complexity.
+Technical sanitized filenames remain the source identity. A separate safe display filename preserves useful human formatting. Uploaded raw files are not retained after ingestion; only chunks, embeddings, and required metadata persist.
 
-**Trade-off:** Retrieved content still leaves the local environment. Prompt-level grounding and abstention reduce risk but do not guarantee faithful behavior.
+**Rationale.** A shared path prevents corpus and upload behavior from drifting. Local embeddings and embedded persistence keep the data flow inspectable and require no Chroma server.
 
-## 5. Evaluation and security validation
+**Alternatives considered.** A purely ephemeral index was rejected because local persistence is useful for repeat demos. A fixed corpus directory alone was rejected in favor of manual uploads. A Chroma server, retained raw-upload store, reranker, and more elaborate indexing infrastructure were deliberately deferred.
 
-**Context:** RAG quality and deterministic security behavior measure different concerns and should not be conflated.
+**Consequences.** Format support and retrieval sophistication are limited. Reprocessing requires another upload, replacement is not failure-atomic, and renamed or removed bundled files can leave stale chunks. The [baseline report](reports/eval.md) also shows that document-level top-three success does not guarantee retrieval of the answer-bearing chunk.
 
-**Decision:** Evaluate retrieval and answer quality with a small manually verifiable golden dataset. Report Hit@3, MRR@3, and Source Recall@3 for retrieval, plus correctness and faithfulness from a separate LLM judge. Validate file types, upload size, query length, and filename handling with deterministic backend tests. Demonstrate prompt-injection resilience with one or two adversarial scenarios rather than a separate benchmark.
+## DL-004 — Narrow external LLM boundary
 
-**Why it fits:** The quality metrics remain interpretable, while guardrails can be tested reliably and independently.
+**Context.** Grounded answers and LLM-based evaluation need an external model, while the corpus and retrieval metadata should remain local wherever possible.
 
-**Trade-off:** LLM-judge results are nondeterministic, and the prompt-injection demonstrations do not establish comprehensive security.
+**Decision.** Use OpenAI only for grounded generation and evaluation. The generation request contains the question and at most three retrieved chunk texts—not the full corpus or internal source and chunk IDs. Prompt instructions require use of provided context and abstention when it is insufficient. API source attribution comes directly from retrieval metadata.
 
-## 6. Local data and observability
+**Rationale.** The boundary minimizes external data exposure, keeps citations deterministic, and avoids conflating model output with source identity.
 
-**Context:** The MVP needs persistent vectors and traceable runtime behavior without committing generated data, sensitive content, or secrets.
+**Alternatives considered.** Multiple model providers and a provider abstraction were deferred. A calibrated retrieval-score abstention threshold was not introduced without evaluation evidence. A separate citation-validation subsystem was rejected because retrieved metadata already supplies traceability for the MVP.
 
-**Decision:** Keep Chroma data and runtime logs local and excluded from Git. Use structured JSON logs without API keys or raw document content, and commit only sanitized example logs.
+**Consequences.** Retrieved content and the user question still leave the local environment. Prompt-level grounding cannot guarantee completeness, faithfulness, or prompt-injection resistance. The [evaluation report](reports/eval.md) retains both successful and failed examples rather than hiding those limitations.
 
-**Why it fits:** This supports debugging and demonstration with a small, explicit data policy.
+## DL-005 — Quality evaluation separate from security validation
 
-**Trade-off:** The MVP provides no centralized logging, automated retention, encryption, or multi-user isolation.
+**Context.** RAG quality, deterministic input controls, and prompt-injection behavior answer different questions and should not be collapsed into one score.
 
-## Limitations and production considerations
+**Decision.** Use a manually reviewed 12-question product-quality dataset. Measure document-level Hit@3, MRR@3, and Source Recall@3. Generate answers through the production path, then use a separately prompted judge for binary correctness and faithfulness with short rationales:
 
-These choices optimize for a focused local demonstration. A production system would need to revisit access control, data governance, observability, retrieval quality, operational resilience, and deployment architecture based on real requirements.
+- Correctness compares the generated answer with the reference answer.
+- Faithfulness compares the generated answer with retrieved context.
+
+Generate [`reports/eval.md`](reports/eval.md) automatically with run configuration, per-case retrieval, answers, judgments, and aggregate metrics. Keep file, filename, upload-size, and query-length controls in deterministic tests. Keep prompt-injection cases in a separate manual demonstration.
+
+**Rationale.** Retrieval failures remain distinguishable from generation failures, while deterministic security behavior stays repeatable and independent of an LLM judge.
+
+**Alternatives considered.** Security cases were intentionally excluded from the golden quality dataset. A comprehensive automated prompt-injection benchmark and more elaborate evaluation platform were deferred as disproportionate to this corpus and MVP.
+
+**Consequences.** Document-level retrieval metrics can count an irrelevant chunk from an expected document as a hit. Binary LLM judgments are model- and run-dependent and can be sensitive to borderline wording. The baseline therefore includes per-case evidence and reports 75.0% correctness and 91.7% faithfulness alongside 100.0% Hit@3, rather than reducing quality to one headline number.
+
+## DL-006 — Minimal structured observability
+
+**Context.** A local demo needs request correlation and retrieval traceability without logging sensitive content or adding an operational logging stack.
+
+**Decision.** Emit one structured JSON event per line to stdout. Request events include method, path, status, duration, and request ID; query events add retrieved source IDs, chunk IDs, and distances. Exclude queries, answers, retrieved and uploaded content, API keys, and environment values. The application does not persist, rotate, or retain logs. Chroma data remains local and excluded from Git.
+
+**Rationale.** This provides enough evidence to debug and demonstrate the request/retrieval flow while keeping the implementation and data policy explicit.
+
+**Alternatives considered.** File logging, centralized collection, tracing infrastructure, and application-managed retention were deliberately deferred. The committed [`logs/example.jsonl`](logs/example.jsonl) is a manually sanitized capture from a real run, not application-managed persistence.
+
+**Consequences.** Logs disappear unless the process output is captured externally. The `generated` query outcome means retrieval returned context and generation was invoked; it does not prove that the model produced a substantive answer rather than an abstention. There is no durable audit trail, centralized search, rotation, retention enforcement, or cross-service tracing.
+
+## Production reconsiderations
+
+These decisions optimize for a small, reviewable local system. Production planning should begin with concrete requirements, then revisit access control and data governance, tenant isolation, index reconciliation and atomic updates, retrieval quality, evaluation stability, durable observability, operational recovery, and deployment architecture. None of those capabilities should be inferred from this MVP.
