@@ -8,6 +8,7 @@ from typing import Any, Sequence
 
 from openai import OpenAI, OpenAIError
 
+from app.config import load_environment
 from app.retrieval import TOP_K, SearchResult
 
 
@@ -46,6 +47,7 @@ class OpenAIAnswerGenerator:
     def from_environment(cls) -> OpenAIAnswerGenerator:
         """Create a generator from local process environment variables."""
 
+        load_environment()
         model = os.getenv("OPENAI_MODEL", "").strip()
         if not model:
             raise AnswerConfigurationError("OPENAI_MODEL must be configured.")

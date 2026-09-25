@@ -1,6 +1,6 @@
 """Run two manual prompt-injection demonstrations against the configured model.
 
-From the backend directory, set OPENAI_API_KEY and OPENAI_MODEL, then run:
+From the backend directory, configure the repository-root .env, then run:
     uv run python -m scripts.demo_prompt_injection
 
 This is a qualitative demonstration, not an automated security benchmark.
