@@ -12,6 +12,7 @@ from typing import Any, Sequence
 
 from openai import OpenAI, OpenAIError
 
+from app.config import load_environment
 from app.retrieval import SearchResult, TOP_K
 
 
@@ -160,6 +161,7 @@ class OpenAIAnswerJudge:
 
     @classmethod
     def from_environment(cls) -> OpenAIAnswerJudge:
+        load_environment()
         model = os.getenv("OPENAI_JUDGE_MODEL", "").strip()
         if not model:
             raise EvaluationError("OPENAI_JUDGE_MODEL must be configured.")
