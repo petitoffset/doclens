@@ -7,6 +7,7 @@ dependencies = [
     "chromadb>=1.0,<2",
     "fastapi>=0.115,<1",
     "openai>=1.66,<3",
+    "python-dotenv>=1.0,<2",
     "python-multipart>=0.0.9,<1",
     "sentence-transformers>=3.0,<6",
     "uvicorn[standard]>=0.30,<1",
