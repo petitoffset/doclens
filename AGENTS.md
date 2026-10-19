@@ -3,9 +3,9 @@
 ## Project principles
 
 - DocLens is an evolving personal RAG application, not a production-ready system.
-- Prefer simple, explicit implementations over unnecessary abstractions.
+- Prefer simple, explicit implementations and incremental, testable improvements.
 - Do not expand scope without explicit approval.
-- Do not introduce LangChain, provider abstractions, reranking, authentication, queues, deployment infrastructure, or other unapproved features unless explicitly approved.
+- Introduce new frameworks, retrieval techniques, or infrastructure only when their value is justified and the change is explicitly approved.
 - Never invent evaluation results.
 - Never commit secrets or API keys.
 - Keep documentation concise.

@@ -1,6 +1,8 @@
 # DocLens
 
-DocLens indexes internal Markdown and text documents, retrieves relevant passages locally, and uses grounded LLM generation to answer questions with traceable sources. It is a focused RAG implementation built to keep the full data flow easy to inspect and defend.
+DocLens is a RAG-based document assistant for searching Markdown and plain-text documents. It uses local embeddings and semantic retrieval to find relevant passages, then generates grounded answers with traceable sources.
+
+The project is developed incrementally, with architectural decisions, evaluation results, and technical limitations documented in the repository.
 
 ## Stack
 

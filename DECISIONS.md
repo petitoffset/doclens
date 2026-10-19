@@ -1,8 +1,8 @@
 # DocLens Technical Decisions
 
-This is a lightweight architectural decision record for the initial DocLens implementation. The decisions remain together because the system is small; [`PLAN.md`](PLAN.md) preserves delivery history, while the generated [`reports/eval.md`](reports/eval.md) preserves measured results.
+This document records DocLens architectural decisions, their rationale, alternatives, and trade-offs. The initial implementation favors an explicit, inspectable RAG pipeline over unnecessary abstractions.
 
-All decisions below are **accepted for the initial implementation**. Production use would require revisiting them against real users, data sensitivity, scale, and operating constraints.
+These decisions reflect the initial architecture and may be revisited as the project evolves. Production use would require additional consideration of security, scale, reliability, and data governance. [`PLAN.md`](PLAN.md) preserves delivery history, while the generated [`reports/eval.md`](reports/eval.md) preserves measured results.
 
 ## Decision index
 
@@ -35,7 +35,7 @@ All decisions below are **accepted for the initial implementation**. Production 
 
 **Rationale.** Python supports Sentence Transformers and ChromaDB directly. React provides the required interactive flow without expanding the backend into UI concerns; TypeScript and the production build add lightweight client-side verification.
 
-**Alternatives considered.** The stack was an established project direction, so a broad framework comparison was not warranted. Deployment infrastructure was deliberately deferred under the initial implementation scope.
+**Alternatives considered.** The stack was an established project direction, so a broad framework comparison was not warranted. Deployment infrastructure was deliberately deferred under the initial scope.
 
 **Consequences.** Backend and frontend have separate runtimes and dependency sets. Vite handles local API proxying; no production hosting or deployment topology is defined.
 
@@ -61,7 +61,7 @@ Technical sanitized filenames remain the source identity. A separate safe displa
 
 **Rationale.** The boundary minimizes external data exposure, keeps citations deterministic, and avoids conflating model output with source identity.
 
-**Alternatives considered.** Multiple model providers and a provider abstraction were deferred. A calibrated retrieval-score abstention threshold was not introduced without evaluation evidence. A separate citation-validation subsystem was rejected because retrieved metadata already supplies traceability for the initial implementation.
+**Alternatives considered.** Multiple model providers and a provider abstraction were deferred. A calibrated retrieval-score abstention threshold was not introduced without evaluation evidence. A separate citation-validation subsystem was rejected because retrieved metadata already supplies traceability for the current implementation.
 
 **Consequences.** Retrieved content and the user question still leave the local environment. Prompt-level grounding cannot guarantee completeness, faithfulness, or prompt-injection resistance. The [evaluation report](reports/eval.md) retains both successful and failed examples rather than hiding those limitations.
 
@@ -78,7 +78,7 @@ Generate [`reports/eval.md`](reports/eval.md) automatically with run configurati
 
 **Rationale.** Retrieval failures remain distinguishable from generation failures, while deterministic security behavior stays repeatable and independent of an LLM judge.
 
-**Alternatives considered.** Security cases were intentionally excluded from the golden quality dataset. A comprehensive automated prompt-injection benchmark and more elaborate evaluation platform were deferred as disproportionate to this corpus and initial implementation.
+**Alternatives considered.** Security cases were intentionally excluded from the golden quality dataset. A comprehensive automated prompt-injection benchmark and more elaborate evaluation platform were deferred as disproportionate to the initial corpus and scope.
 
 **Consequences.** Document-level retrieval metrics can count an irrelevant chunk from an expected document as a hit. Binary LLM judgments are model- and run-dependent and can be sensitive to borderline wording. The baseline therefore includes per-case evidence and reports 75.0% correctness and 91.7% faithfulness alongside 100.0% Hit@3, rather than reducing quality to one headline number.
 
@@ -103,7 +103,7 @@ Generate [`reports/eval.md`](reports/eval.md) automatically with run configurati
 - Returned sources are traceable retrieval metadata. They show which chunks the backend supplied, not which source the model used for each statement in its answer.
 - Query observability records `outcome="generated"` whenever context was retrieved and generation was invoked, including when the model returns the exact insufficient-context abstention. Application logs are stdout-only unless captured externally.
 - The 12-case baseline uses a small synthetic corpus. LLM-judge results are model- and run-dependent, while prompt-injection behavior is demonstrated separately rather than covered by a comprehensive automated security benchmark.
-- Authentication, multi-user isolation, and authorization-aware retrieval are outside the initial implementation, so the system is not suitable for shared production data as implemented.
+- Authentication, multi-user isolation, and authorization-aware retrieval are not implemented, so the system is not suitable for shared production data as implemented.
 
 ## Production next steps
 

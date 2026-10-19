@@ -1,6 +1,6 @@
 # DocLens Implementation Plan
 
-This roadmap tracks the five milestones required to deliver the initial DocLens implementation. Each milestone keeps its current status alongside its scope so progress is clear without a separate tracker.
+This plan records the five completed milestones of the initial DocLens implementation. Each milestone documents its original scope, deliverables, and completion status. New milestones will be added here as future improvements are selected and scoped.
 
 ## 1. Project foundation
 
@@ -57,7 +57,7 @@ Provide a React single-page interface for the complete user flow:
 
 **Status:** Completed
 
-Measure RAG quality and document the finished initial implementation:
+Measure RAG quality and document the initial implementation:
 
 - Small, manually verifiable golden dataset for retrieval and answer quality
 - Retrieval metrics:

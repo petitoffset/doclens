@@ -152,7 +152,7 @@ def document_from_upload(
 ) -> SourceDocument:
     """Validate upload-specific constraints, then enter the shared pipeline.
 
-    The sanitized filename is the current source identity. Uploading that filename
+    The sanitized filename currently serves as the source identity. Uploading that filename
     again intentionally replaces its previously indexed chunks.
     """
 

@@ -93,7 +93,7 @@ The [generated report](../reports/eval.md) is the source of truth for per-case r
 - Retrieved evidence does not guarantee a complete answer. In the accepted-events case, generation omits the possible cache delay and overstates immediate visibility after manual refresh.
 - The CSV support-ticket result is borderline and judge-sensitive: the generated answer gives the corrective steps but does not explicitly state that uploading the corrected file succeeded.
 - Binary LLM judgments are model- and run-dependent. Aggregate scores should be read alongside answers and rationales.
-- Twelve synthetic cases are appropriate for an inspectable initial baseline, not statistical evidence of production quality.
+- Twelve synthetic evaluation cases provide an inspectable initial baseline, not statistical evidence of production quality.
 
 No retrieval or generation settings were tuned after observing this baseline. Known failures are retained as evidence and potential next-step inputs.
 
